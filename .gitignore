@@ -1,0 +1,10 @@
+*.o
+*.out
+shell
+fs_shell
+*.img
+*.fs
+references/
+*~
+.#*
+.vscode/
