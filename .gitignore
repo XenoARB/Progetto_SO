@@ -4,7 +4,7 @@ shell
 fs_shell
 *.img
 *.fs
-references/
+reference/
 *~
 .#*
 .vscode/
