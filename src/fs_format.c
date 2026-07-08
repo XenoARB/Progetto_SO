@@ -25,7 +25,7 @@ int fs_format(const char *path, size_t size){
     sb->root_block = BLOCK_NONE;
     sb->head = (num_blocks>1) ? 1 : BLOCK_NONE;
 
-    for(uint32_t i=0; i<num_blocks; i++){
+    for(uint32_t i=1; i<num_blocks; i++){
         Blockheader *bh= (Blockheader *) ((char *) mf.mem + i * BLOCK_SIZE);
         bh->next = (i + 1<num_blocks) ? (i+1) : BLOCK_NONE;
     }
