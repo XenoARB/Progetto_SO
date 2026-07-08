@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-int mapped_file_open(MmappedFile *mf, const char *path) {
+int mf_open(MmappedFile *mf, const char *path) {
     mf->fd = open(path, O_RDWR | O_CREAT, 0660);
     if (mf->fd == -1) {
         perror("Error opening file");
@@ -25,7 +25,7 @@ int mapped_file_open(MmappedFile *mf, const char *path) {
     return 0;
 }
 
-int mapped_file_map(MmappedFile *mf){
+int mf_map(MmappedFile *mf){
     if (mf->size == 0){
         mf->mem = NULL;
         return 0;
@@ -48,9 +48,30 @@ int mapped_file_map(MmappedFile *mf){
     return 0;
 }
 
-void mapped_file_close(MmappedFile *mf){
+void mf_close(MmappedFile *mf){
     if(mf->mem){
         munmap(mf->mem, mf->size);
     }
     close(mf->fd);
+}
+
+int mf_resize(MmappedFile *mf, size_t new_size){
+    
+    if(new_size==mf->size) return 0;
+    
+    if(mf->mem){
+        munmap(mf->mem, mf->size);
+        mf->mem=NULL;
+    }
+    
+    int ret=ftruncate(mf->fd, new_size);
+    
+    if(ret<0){
+        perror("ftruncate");
+        return -1;
+    }
+
+    mf->size=new_size;
+
+    return mf_map(mf);
 }

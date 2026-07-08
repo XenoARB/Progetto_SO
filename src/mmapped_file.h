@@ -7,8 +7,10 @@ typedef struct {
     size_t size;
 }MmappedFile;
 
-int mapped_file_open(MmappedFile *mf, const char *path);
+int mf_open(MmappedFile *mf, const char *path);
 
-int mapped_file_map(MmappedFile *mf);
+int mf_map(MmappedFile *mf);
 
-void mapped_file_close(MmappedFile *mf);
+void mf_close(MmappedFile *mf);
+
+int mf_resize(MmappedFile *mf, size_t new_size);
