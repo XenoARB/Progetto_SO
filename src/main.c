@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "shell.h"
 
 #define MAX_LINE 256
 #define MAX_ARGS 16
@@ -27,7 +28,7 @@ int main() {
 
         if(argc==0) continue;
 
-        printf("comando: %s (argc=%d)\n", args[0], argc);
+        shell_dispatch(argc, args);
     }
 
     return 0;
