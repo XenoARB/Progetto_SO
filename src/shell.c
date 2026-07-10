@@ -1,10 +1,13 @@
 #include "shell.h"
 #include "mmapped_file.h"
 #include "fs_format.h"
+#include "fs_types.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+static uint32_t cwd;
 
 
 typedef void (*CommandFn)(int argc, char **args);
@@ -45,6 +48,8 @@ static void cmd_format(int argc, char **args){
     }
 
     fs_open=1;
+    Superblock *sb = (Superblock *) mf.mem;
+    cwd=sb->root_block;
     printf("file system formattato e aperto\nfs_path: %s\n", path);
     return;
 }
