@@ -1,19 +1,81 @@
 #include "shell.h"
+#include "mmapped_file.h"
+#include "fs_format.h"
+
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 
 typedef void (*CommandFn)(int argc, char **args);
 
-static void cmd_format(int argc, char **args) {printf("format placeholder");}
-static void cmd_mkdir(int argc, char **args)  {printf("mkdir placeholder");}
-static void cmd_cd(int argc, char **args)     {printf("cd placeholder");}
-static void cmd_touch(int argc, char **args)  {printf("touch placeholder");}
-static void cmd_cat(int argc, char **args)    {printf("cat placeholder");}
-static void cmd_ls(int argc, char **args)     {printf("ls placeholder");}
-static void cmd_append(int argc, char **args) {printf("append placeholder");}
-static void cmd_rm(int argc, char **args)     {printf("rm placeholder");}
-static void cmd_close(int argc, char **args)  {printf("close placeholder");}
+
+
+static MmappedFile mf;
+static int fs_open = 0;
+
+static void cmd_format(int argc, char **args){
+    if(!(argc==3)){
+        printf("usare il formato: format <file> <size>\n");
+        return;
+    }
+    if(fs_open){
+        printf("fs già aperto\n");
+        return;
+    }
+
+    const char *path=args[1];
+    size_t size=(size_t) strtoul(args[2], NULL, 10);
+
+    int ret=fs_format(path, size);
+    if(ret<0){
+        printf("errore format\n");
+        return;
+    }
+
+    ret=mf_open(&mf, path);
+    if(ret<0){
+        printf("errore di apertura\n");
+        return;
+    }
+    ret=mf_map(&mf);
+    if(ret<0){
+        printf("errore di mappatura\n");
+        return;
+    }
+
+    fs_open=1;
+    printf("file system formattato e aperto\nfs_path: %s\n", path);
+    return;
+}
+
+static void cmd_close(int argc,char **args){
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+    else{
+        mf_close(&mf);
+        fs_open=0;
+        printf("fs chiuso\n");
+        return;
+    }
+}
+
+
+
+
+
+
+
+
+static void cmd_mkdir(int argc, char **args)  {printf("mkdir placeholder\n");}
+static void cmd_cd(int argc, char **args)     {printf("cd placeholder\n");}
+static void cmd_touch(int argc, char **args)  {printf("touch placeholder\n");}
+static void cmd_cat(int argc, char **args)    {printf("cat placeholder\n");}
+static void cmd_ls(int argc, char **args)     {printf("ls placeholder\n");}
+static void cmd_append(int argc, char **args) {printf("append placeholder\n");}
+static void cmd_rm(int argc, char **args)     {printf("rm placeholder\n");}
 
 typedef struct{
     const char *name;
@@ -43,3 +105,4 @@ void shell_dispatch(int argc, char **args){
     }
     printf("comando %s non esiste\n ",args[0]);
 }
+
