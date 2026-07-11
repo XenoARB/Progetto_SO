@@ -2,6 +2,7 @@
 #include "mmapped_file.h"
 #include "fs_format.h"
 #include "fs_types.h"
+#include "dir.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -67,14 +68,47 @@ static void cmd_close(int argc,char **args){
     }
 }
 
+static void cmd_mkdir(int argc, char **args){
+    if(argc!=2){
+        printf("usare il formato: mkdir <nome>\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+    if(find(&mf, cwd, args[1])!=NULL){
+        printf("esiste già una voce con questo nome\n");
+        return;
+    }
+
+    uint32_t dirblock= new_dirblock(&mf);
+    if(dirblock== BLOCK_NONE){
+        printf("spazio esaurito\n");
+        return;
+    }
+
+    DirEntry *slot = add_direntry(&mf, cwd);
+    if(slot==NULL){
+        free_block(&mf, dirblock);
+        printf("spazio esaurito\n");
+        return;
+    }
+
+    strncpy(slot->name, args[1], NAME_MAX_LEN-1);
+    slot->name[NAME_MAX_LEN-1] ='\0';
+    slot->type=ENTRY_DIR;
+    slot->first_block=dirblock;
+    slot->size=0;
+
+    printf("%s creata\n", args[1]);
+}
 
 
 
 
 
 
-
-static void cmd_mkdir(int argc, char **args)  {printf("mkdir placeholder\n");}
 static void cmd_cd(int argc, char **args)     {printf("cd placeholder\n");}
 static void cmd_touch(int argc, char **args)  {printf("touch placeholder\n");}
 static void cmd_cat(int argc, char **args)    {printf("cat placeholder\n");}
