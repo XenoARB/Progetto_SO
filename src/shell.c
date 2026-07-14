@@ -2,12 +2,16 @@
 #include "mmapped_file.h"
 #include "fs_format.h"
 #include "fs_types.h"
+#include "dir.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
 static uint32_t cwd;
+#define MAX_DEPTH 64
+static int depth=0;
+static uint32_t path_stack[MAX_DEPTH];
 
 
 typedef void (*CommandFn)(int argc, char **args);
@@ -67,18 +71,159 @@ static void cmd_close(int argc,char **args){
     }
 }
 
+static void cmd_mkdir(int argc, char **args){
+    if(argc!=2){
+        printf("usare il formato: mkdir <nome>\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+    if(find(&mf, cwd, args[1])!=NULL){
+        printf("esiste già una voce con questo nome\n");
+        return;
+    }
+
+    uint32_t dirblock= new_dirblock(&mf);
+    if(dirblock== BLOCK_NONE){
+        printf("spazio esaurito\n");
+        return;
+    }
+
+    DirEntry *slot = add_direntry(&mf, cwd);
+    if(slot==NULL){
+        free_block(&mf, dirblock);
+        printf("spazio esaurito\n");
+        return;
+    }
+
+    strncpy(slot->name, args[1], NAME_MAX_LEN-1);
+    slot->name[NAME_MAX_LEN-1] ='\0';
+    slot->type=ENTRY_DIR;
+    slot->first_block=dirblock;
+    slot->size=0;
+
+    printf("%s creata\n", args[1]);
+}
 
 
+static void cmd_touch(int argc, char **args){
+    if(argc!=2){
+        printf("usare il formato: touch <nome>\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+    if(find(&mf, cwd, args[1])!=NULL){
+        printf("esiste gia una voce con queto nome\n");
+        return;
+    }
+
+    DirEntry *slot=add_direntry(&mf, cwd);
+    if(slot==NULL){
+        printf("spazio esaurito\n");
+        return;
+    }
+
+    strncpy(slot->name, args[1], NAME_MAX_LEN-1);
+    slot->name[NAME_MAX_LEN-1] ='\0';
+    slot->type=ENTRY_FILE;
+    slot->first_block=BLOCK_NONE;
+    slot->size=0;
+
+    printf("%s creato\n", args[1]);
+    return;
+}
+
+static void cmd_ls(int argc, char **args){
+    if(argc!=1){
+        printf("usa ls senza argomenti");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+
+    uint32_t block=cwd;
+    while(block!=BLOCK_NONE){
+        char *base=(char*) mf.mem + block*BLOCK_SIZE;
+        DirEntry *entry=(DirEntry *)(base+sizeof(Blockheader));
+
+        for(uint32_t i=0; i<ENTRY_BLOCK; i++){
+            if(entry[i].type==ENTRY_FREE) continue;
+            const char *tipo=(entry[i].type==ENTRY_DIR) ? "dir" : "file";
+            printf("%s \t\t<%s>\n", entry[i].name, tipo);
+        }
+    Blockheader *bh=(Blockheader *) base;
+    block=bh->next;
+    }
+}
 
 
+static void cmd_cd(int argc, char **args){
+    if(argc!=2){
+        printf("usare il formato: cd\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+
+    uint32_t tmp_cwd;
+    int tmp_depth;
+    uint32_t tmp_stack[MAX_DEPTH];
+
+    if(args[1][0]=='/'){
+        Superblock *sb= (Superblock *) mf.mem;
+        tmp_cwd=sb->root_block;
+        tmp_depth=0;
+    }
+    else{
+        tmp_cwd=cwd;
+        tmp_depth=depth;
+        memcpy(tmp_stack, path_stack, depth*sizeof(uint32_t));
+    }
+
+    char *token=strtok(args[1], "/");
+    while(token!=NULL){
+        if(strcmp(token, "..")==0){
+            if(tmp_depth==0){
+                printf("sei già nella radice\n");
+                return;
+            }
+            tmp_cwd=tmp_stack[--tmp_depth];
+        } 
+        else {
+            DirEntry *entry=find(&mf, tmp_cwd, token);
+            if(entry==NULL){
+                printf("%s non esiste\n", token);
+                return;
+            }
+            if(entry->type!=ENTRY_DIR){
+                printf("%s non è una directory\n", token);
+                return;
+            }
+            if(tmp_depth>=MAX_DEPTH){
+                printf("percorso troppo profondo\n");
+                return;
+            }
+            tmp_stack[tmp_depth++]=tmp_cwd;
+            tmp_cwd=entry->first_block;
+        }
+        token=strtok(NULL, "/");
+    }
+    cwd=tmp_cwd;
+    depth=tmp_depth;
+    memcpy(path_stack, tmp_stack, tmp_depth*sizeof(uint32_t));
+}
 
 
-
-static void cmd_mkdir(int argc, char **args)  {printf("mkdir placeholder\n");}
-static void cmd_cd(int argc, char **args)     {printf("cd placeholder\n");}
-static void cmd_touch(int argc, char **args)  {printf("touch placeholder\n");}
 static void cmd_cat(int argc, char **args)    {printf("cat placeholder\n");}
-static void cmd_ls(int argc, char **args)     {printf("ls placeholder\n");}
 static void cmd_append(int argc, char **args) {printf("append placeholder\n");}
 static void cmd_rm(int argc, char **args)     {printf("rm placeholder\n");}
 
