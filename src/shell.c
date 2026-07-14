@@ -166,7 +166,7 @@ static void cmd_ls(int argc, char **args){
 
 static void cmd_cd(int argc, char **args){
     if(argc!=2){
-        printf("usare il formato: cd\n");
+        printf("usare il formato: cd <directory>\n");
         return;
     }
     if(!fs_open){
@@ -223,8 +223,103 @@ static void cmd_cd(int argc, char **args){
 }
 
 
+static void cmd_append(int argc, char **args){
+    if(argc<3){
+        printf("usare il formato: append <file> <testo>\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+
+    DirEntry *entry=find(&mf, cwd, args[1]);
+    if(entry==NULL){
+        printf("%s non esiste in questa directory\n", args[1]);
+        return;
+    }
+    if(entry->type!=ENTRY_FILE){
+        printf("%s non è un file\n", args[1]);
+        return;
+    }
+
+    char text[256]="";
+    for(int i=2; i<argc; i++){
+        strcat(text, args[i]);
+        if(i<argc-1) strcat(text, " ");
+    }
+
+    const uint32_t max= BLOCK_SIZE-sizeof(Blockheader);
+    uint32_t last;
+    uint32_t used;
+
+    if(entry->first_block==BLOCK_NONE){
+        last=alloc_block(&mf);
+        if(last==BLOCK_NONE){
+            printf("spazio esaurito\n");
+            return;
+        }
+        Blockheader *bh=(Blockheader *)((char *) mf.mem + last*BLOCK_SIZE);
+        bh->next=BLOCK_NONE;
+        entry->first_block=last;
+        used=0;
+    } 
+    else {
+        last=entry->first_block;
+        Blockheader *bh=(Blockheader *)((char *) mf.mem + last*BLOCK_SIZE);
+        while(bh->next!=BLOCK_NONE){
+            last=bh->next;
+            bh=(Blockheader *)((char *) mf.mem + last*BLOCK_SIZE);
+        }
+        used=entry->size % max;
+        if(entry->size>0 && used==0){
+            uint32_t nb=alloc_block(&mf);
+            if(nb==BLOCK_NONE){
+                printf("spazio esaurito\n");
+                return;
+            }
+            bh->next=nb;
+            Blockheader *nbh=(Blockheader *)((char *) mf.mem + nb*BLOCK_SIZE);
+            nbh->next=BLOCK_NONE;
+            last=nb;
+            used=0;
+        }
+    }
+
+    size_t len=strlen(text);
+    size_t written=0;
+    while(written<len){
+        char *base=(char *) mf.mem + last*BLOCK_SIZE;
+        char *content=base+sizeof(Blockheader);
+        size_t space=max-used;
+        size_t chunk=(len-written<space) ? (len-written) : space;
+
+        memcpy(content+used, text+written, chunk);
+        written+=chunk;
+        used+=chunk;
+
+        if(written<len){
+            uint32_t nb=alloc_block(&mf);
+            if(nb==BLOCK_NONE){
+                printf("spazio esaurito, scritti %zu byte su %zu\n", written, len);
+                break;
+            }
+            Blockheader *bh=(Blockheader *) base;
+            bh->next=nb;
+            Blockheader *nbh=(Blockheader *)((char *) mf.mem + nb*BLOCK_SIZE);
+            nbh->next=BLOCK_NONE;
+            last=nb;
+            used=0;
+        }
+    }
+
+    entry->size += written;
+    printf("%zu byte aggiunti a %s\n", written, args[1]);
+    
+
+}
+
 static void cmd_cat(int argc, char **args)    {printf("cat placeholder\n");}
-static void cmd_append(int argc, char **args) {printf("append placeholder\n");}
 static void cmd_rm(int argc, char **args)     {printf("rm placeholder\n");}
 
 typedef struct{
