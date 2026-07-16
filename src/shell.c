@@ -3,6 +3,7 @@
 #include "fs_format.h"
 #include "fs_types.h"
 #include "dir.h"
+#include "block_alloc.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -319,8 +320,57 @@ static void cmd_append(int argc, char **args){
 
 }
 
+
+static void cmd_rm(int argc, char **args){
+    if(argc!=2){
+        printf("usare il formato: rm <nome>\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+
+    DirEntry *entry=find(&mf, cwd, args[1]);
+    if(entry==NULL){
+        printf("%s non esiste", args[1]);
+        return;
+    }
+
+    if(entry->type==ENTRY_DIR){
+        uint32_t block=entry->first_block;
+        while(block!=BLOCK_NONE){
+            char *base=(char *) mf.mem + block*BLOCK_SIZE;
+            DirEntry *sub=(DirEntry *)(base+sizeof(Blockheader));
+
+            for(uint32_t i=0; i<ENTRY_BLOCK; i++){
+                if(sub[i].type!=ENTRY_FREE){
+                    printf("directory non vuota\n");
+                    return;
+                }
+            }
+
+            Blockheader *bh=(Blockheader *) base;
+            block=bh->next;
+        }
+    }
+
+    uint32_t block=entry->first_block;
+    while(block!=BLOCK_NONE){
+        Blockheader *bh=(Blockheader *)((char *) mf.mem + block*BLOCK_SIZE);
+        uint32_t next=bh->next;
+        free_block(&mf, block);
+        block=next;
+    }
+
+    entry->type=ENTRY_FREE;
+    entry->first_block=BLOCK_NONE;
+    entry->size=0;
+
+    printf("%s rimosso\n", args[1]);
+}
+
 static void cmd_cat(int argc, char **args)    {printf("cat placeholder\n");}
-static void cmd_rm(int argc, char **args)     {printf("rm placeholder\n");}
 
 typedef struct{
     const char *name;
