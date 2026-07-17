@@ -10,7 +10,7 @@ int main() {
     char line[MAX_LINE];
 
     while(1){
-        printf("> ");
+        print_dir();
         char *input=fgets(line, sizeof(line), stdin);
         
         if(input==NULL) break;

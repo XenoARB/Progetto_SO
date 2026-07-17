@@ -3,6 +3,8 @@
 #include "fs_format.h"
 #include "fs_types.h"
 #include "dir.h"
+#include "block_alloc.h"
+#include "fs_debug.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -12,6 +14,7 @@ static uint32_t cwd;
 #define MAX_DEPTH 64
 static int depth=0;
 static uint32_t path_stack[MAX_DEPTH];
+static char name_stack[MAX_DEPTH][NAME_MAX_LEN];
 
 
 typedef void (*CommandFn)(int argc, char **args);
@@ -54,7 +57,9 @@ static void cmd_format(int argc, char **args){
     fs_open=1;
     Superblock *sb = (Superblock *) mf.mem;
     cwd=sb->root_block;
+    depth=0;
     printf("file system formattato e aperto\nfs_path: %s\n", path);
+    print_superblock(&mf);
     return;
 }
 
@@ -156,7 +161,7 @@ static void cmd_ls(int argc, char **args){
         for(uint32_t i=0; i<ENTRY_BLOCK; i++){
             if(entry[i].type==ENTRY_FREE) continue;
             const char *tipo=(entry[i].type==ENTRY_DIR) ? "dir" : "file";
-            printf("%s \t\t<%s>\n", entry[i].name, tipo);
+            printf("%s \t\t\t<%s>\n", entry[i].name, tipo);
         }
     Blockheader *bh=(Blockheader *) base;
     block=bh->next;
@@ -177,6 +182,7 @@ static void cmd_cd(int argc, char **args){
     uint32_t tmp_cwd;
     int tmp_depth;
     uint32_t tmp_stack[MAX_DEPTH];
+    char tmp_name_stack[MAX_DEPTH][NAME_MAX_LEN];
 
     if(args[1][0]=='/'){
         Superblock *sb= (Superblock *) mf.mem;
@@ -187,6 +193,7 @@ static void cmd_cd(int argc, char **args){
         tmp_cwd=cwd;
         tmp_depth=depth;
         memcpy(tmp_stack, path_stack, depth*sizeof(uint32_t));
+        memcpy(tmp_name_stack, name_stack, depth*sizeof(name_stack[0]));
     }
 
     char *token=strtok(args[1], "/");
@@ -212,7 +219,10 @@ static void cmd_cd(int argc, char **args){
                 printf("percorso troppo profondo\n");
                 return;
             }
-            tmp_stack[tmp_depth++]=tmp_cwd;
+            tmp_stack[tmp_depth]=tmp_cwd;
+            strncpy(tmp_name_stack[tmp_depth], token, NAME_MAX_LEN-1);
+            tmp_name_stack[tmp_depth][NAME_MAX_LEN-1]='\0';
+            tmp_depth++;
             tmp_cwd=entry->first_block;
         }
         token=strtok(NULL, "/");
@@ -220,6 +230,7 @@ static void cmd_cd(int argc, char **args){
     cwd=tmp_cwd;
     depth=tmp_depth;
     memcpy(path_stack, tmp_stack, tmp_depth*sizeof(uint32_t));
+    memcpy(name_stack, tmp_name_stack, tmp_depth*sizeof(name_stack[0]));
 }
 
 
@@ -319,8 +330,151 @@ static void cmd_append(int argc, char **args){
 
 }
 
-static void cmd_cat(int argc, char **args)    {printf("cat placeholder\n");}
-static void cmd_rm(int argc, char **args)     {printf("rm placeholder\n");}
+
+static void cmd_rm(int argc, char **args){
+    if(argc!=2){
+        printf("usare il formato: rm <nome>\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+
+    DirEntry *entry=find(&mf, cwd, args[1]);
+    if(entry==NULL){
+        printf("%s non esiste\n", args[1]);
+        return;
+    }
+
+    if(entry->type==ENTRY_DIR){
+        uint32_t block=entry->first_block;
+        while(block!=BLOCK_NONE){
+            char *base=(char *) mf.mem + block*BLOCK_SIZE;
+            DirEntry *sub=(DirEntry *)(base+sizeof(Blockheader));
+
+            for(uint32_t i=0; i<ENTRY_BLOCK; i++){
+                if(sub[i].type!=ENTRY_FREE){
+                    printf("directory non vuota\n");
+                    return;
+                }
+            }
+
+            Blockheader *bh=(Blockheader *) base;
+            block=bh->next;
+        }
+    }
+
+    uint32_t block=entry->first_block;
+    while(block!=BLOCK_NONE){
+        Blockheader *bh=(Blockheader *)((char *) mf.mem + block*BLOCK_SIZE);
+        uint32_t next=bh->next;
+        free_block(&mf, block);
+        block=next;
+    }
+
+    entry->type=ENTRY_FREE;
+    entry->first_block=BLOCK_NONE;
+    entry->size=0;
+
+    printf("%s rimosso\n", args[1]);
+}
+
+static void cmd_cat(int argc, char **args){
+    if(argc!=2){
+        printf("usa il formato: cat <nome>\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+
+    DirEntry *entry=find(&mf, cwd, args[1]);
+    if(entry==NULL){
+        printf("%s non esiste\n", args[1]);
+        return;
+    }
+    if(entry->type!=ENTRY_FILE){
+        printf("%s non è un file\n", args[1]);
+        return;
+    }
+
+    const uint32_t max=BLOCK_SIZE-sizeof(Blockheader);
+    uint32_t block=entry->first_block;
+    uint32_t rest=entry->size;
+
+    while(block!=BLOCK_NONE && rest>0){
+        char *base=(char *) mf.mem +block*BLOCK_SIZE;
+        char *content=base+sizeof(Blockheader);
+
+        uint32_t chunk=(rest<max) ? rest : max;
+        fwrite(content, 1, chunk, stdout);
+
+        rest-=chunk;
+
+        Blockheader *bh=(Blockheader *) base;
+        block=bh->next;
+    }
+    printf("\n");
+}
+
+void print_dir(void){
+     if(!fs_open){
+        printf("> ");
+        return;
+    }
+    printf("root");
+    for(int i=0; i<depth; i++){
+        printf("/%s", name_stack[i]);
+    }
+    printf(" > ");
+}
+
+static void cmd_open(int argc, char **args){
+    if(argc!=2){
+        printf("usa il formato: open <nome>\n");
+        return;
+    }
+    if(fs_open){
+        printf("fs già aperto\n");
+        return;
+    }
+
+    const char *path=args[1];
+
+    int ret=mf_open(&mf, path);
+    if(ret<0){
+        printf("errore di apertura\n");
+        return;
+    }
+
+    if(mf.size<BLOCK_SIZE){
+        mf_close(&mf);
+        printf("fs non valido\n");
+        return;
+    }
+
+    ret=mf_map(&mf);
+    if(ret<0){
+        printf("errore di mappatura\n");
+        return;
+    }
+
+    Superblock *sb=(Superblock *) mf.mem;
+    if(sb->magic!=FS_MAGIC){
+        mf_close(&mf);
+        printf("%s non ha una firma riconosciuta\n", path);
+        return;
+    }
+
+    fs_open=1;
+    cwd=sb->root_block;
+    depth=0;
+    printf("file system aperto\npath: %s\n--------Superblock--------\n", path);
+    print_superblock(&mf);
+    return;
+}
 
 typedef struct{
     const char *name;
@@ -336,10 +490,11 @@ static Command command[]={
     {"ls", cmd_ls},
     {"append", cmd_append},
     {"rm", cmd_rm},
-    {"close", cmd_close}
+    {"close", cmd_close},
+    {"open", cmd_open}
 };
 
-#define N_COMM 9
+#define N_COMM 10
 
 void shell_dispatch(int argc, char **args){
     for (size_t i=0; i<N_COMM; i++){
