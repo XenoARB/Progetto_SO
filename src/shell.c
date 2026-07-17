@@ -476,6 +476,44 @@ static void cmd_open(int argc, char **args){
     return;
 }
 
+static void cmd_printsb(int argc, char **args){
+    if(argc!=1){
+        printf("usa il formato: printsb\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+
+    print_superblock(&mf);
+}
+
+static void cmd_printch(int argc, char **args){
+    if(argc!=2){
+        printf("usa il formato: printchain <-freelist | nome>\n");
+        return;
+    }
+    if(!fs_open){
+        printf("fs non aperto\n");
+        return;
+    }
+
+    if(strcmp(args[1], "-freelist")==0){
+        Superblock *sb=(Superblock *) mf.mem;
+        print_chain(&mf, sb->head);
+        return;
+    }
+
+    DirEntry *entry=find(&mf, cwd, args[1]);
+    if(entry==NULL){
+        printf("%s non esiste\n", args[1]);
+        return;
+    }
+
+    print_chain(&mf, entry->first_block);
+}
+
 typedef struct{
     const char *name;
     CommandFn fn;
@@ -491,10 +529,12 @@ static Command command[]={
     {"append", cmd_append},
     {"rm", cmd_rm},
     {"close", cmd_close},
-    {"open", cmd_open}
+    {"open", cmd_open},
+    {"printsb", cmd_printsb},
+    {"printch", cmd_printch}
 };
 
-#define N_COMM 10
+#define N_COMM 12
 
 void shell_dispatch(int argc, char **args){
     for (size_t i=0; i<N_COMM; i++){

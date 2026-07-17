@@ -33,6 +33,9 @@ Comandi disponibili:
 | `append` | `append <file> <testo>` | Aggiunge testo in coda a un file, allocando nuovi blocchi se necessario. |
 | `cat` | `cat <file>` | Stampa il contenuto di un file. |
 | `rm` | `rm <nome>` | Rimuove un file, o una directory se è vuota. |
+| `printsb` | `printsb` | Stampa il superblocco del file system attualmente aperto (comando di debug). |
+| `printchain` | `printchain <-freelist \| nome>` | Stampa la catena di blocchi: quella della free list con `-freelist`, oppure quella di un file/directory nella directory corrente passandone il nome (comando di debug). |
+
 
 
 
