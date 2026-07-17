@@ -1,18 +1,18 @@
 # Progetto_SO - Shell con FS
 
-Progetto per il corso di sistemi opertativi del Prof. Grisetti: un file sistem persistente bastato sulla mappatura "mmap". Il FIle System è contenuto in un file immagine e pilotato da una shell.
+Progetto per il corso di sistemi opertativi del Prof. Grisetti: un file system persistente bastato sulla mappatura "mmap". Il File System è contenuto in un file immagine e pilotato da una shell.
 
 ## Descrizione
 
-Il File System è organizzato in blocchi di dimensione fissa (-Default 4096byte). Un blocco iniziale chiamato SuperBlock con le informazioni di tutto il File System e un indice del primo blocco libero (ancora da allocare), tutti gli altri blocchi hanno i primi 4byte con l'indice del blocco successivo della catena a cui appartiene: file/directory.
+Il File System è organizzato in blocchi di dimensione fissa (-Default 4096byte). Un blocco iniziale chiamato SuperBlock con le informazioni di tutto il File System e un indice del primo blocco libero (ancora da allocare), tutti gli altri blocchi hanno i primi 4byte con l'indice del blocco successivo della catena a cui appartiene: file/directory/free list.
 
 Ogni blocco è referenziato tramite indici e mai come indirizzi.
 
 ## Requisiti
 
--gcc con supporto a --std=gnu99
--make
--Sistema POSIX
+- gcc con supporto a --std=gnu99
+- make
+- Sistema POSIX
 
 ## Utilizzo
 
