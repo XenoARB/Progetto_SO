@@ -4,6 +4,7 @@
 #include "fs_types.h"
 #include "dir.h"
 #include "block_alloc.h"
+#include "fs_debug.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -56,7 +57,9 @@ static void cmd_format(int argc, char **args){
     fs_open=1;
     Superblock *sb = (Superblock *) mf.mem;
     cwd=sb->root_block;
+    depth=0;
     printf("file system formattato e aperto\nfs_path: %s\n", path);
+    print_superblock(&mf);
     return;
 }
 
@@ -428,6 +431,51 @@ void print_dir(void){
     printf(" > ");
 }
 
+static void cmd_open(int argc, char **args){
+    if(argc!=2){
+        printf("usa il formato: open <nome>\n");
+        return;
+    }
+    if(fs_open){
+        printf("fs già aperto\n");
+        return;
+    }
+
+    const char *path=args[1];
+
+    int ret=mf_open(&mf, path);
+    if(ret<0){
+        printf("errore di apertura\n");
+        return;
+    }
+
+    if(mf.size<BLOCK_SIZE){
+        mf_close(&mf);
+        printf("fs non valido\n");
+        return;
+    }
+
+    ret=mf_map(&mf);
+    if(ret<0){
+        printf("errore di mappatura\n");
+        return;
+    }
+
+    Superblock *sb=(Superblock *) mf.mem;
+    if(sb->magic!=FS_MAGIC){
+        mf_close(&mf);
+        printf("%s non ha una firma riconosciuta\n", path);
+        return;
+    }
+
+    fs_open=1;
+    cwd=sb->root_block;
+    depth=0;
+    printf("file system aperto\npath: %s\n--------Superblock--------\n", path);
+    print_superblock(&mf);
+    return;
+}
+
 typedef struct{
     const char *name;
     CommandFn fn;
@@ -442,10 +490,11 @@ static Command command[]={
     {"ls", cmd_ls},
     {"append", cmd_append},
     {"rm", cmd_rm},
-    {"close", cmd_close}
+    {"close", cmd_close},
+    {"open", cmd_open}
 };
 
-#define N_COMM 9
+#define N_COMM 10
 
 void shell_dispatch(int argc, char **args){
     for (size_t i=0; i<N_COMM; i++){
