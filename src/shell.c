@@ -33,9 +33,12 @@ static void cmd_format(int argc, char **args){
         printf("fs già aperto\n");
         return;
     }
-
-    const char *path=args[1];
+        const char *path=args[1];
     size_t size=(size_t) strtoul(args[2], NULL, 10);
+    if(size<(2*BLOCK_SIZE)){
+        printf("fs troppo piccolo\n");
+        return;
+    }
 
     int ret=fs_format(path, size);
     if(ret<0){

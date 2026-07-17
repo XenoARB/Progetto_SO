@@ -4,7 +4,7 @@ Progetto per il corso di sistemi opertativi del Prof. Grisetti: un file system p
 
 ## Descrizione
 
-Il File System è organizzato in blocchi di dimensione fissa (-Default 4096byte). Un blocco iniziale chiamato SuperBlock con le informazioni di tutto il File System e un indice del primo blocco libero (ancora da allocare), tutti gli altri blocchi hanno i primi 4byte con l'indice del blocco successivo della catena a cui appartiene: file/directory/free list.
+Il File System è organizzato in blocchi di dimensione fissa (-Default 4096byte). Un blocco iniziale chiamato SuperBlock con le informazioni di tutto il File System e un indice del primo blocco libero (ancora da allocare), tutti gli altri blocchi hanno i primi 4byte con l'indice del blocco successivo della catena a cui appartengono: file/directory/free list.
 
 Ogni blocco è referenziato tramite indici e mai come indirizzi.
 
@@ -16,7 +16,7 @@ Ogni blocco è referenziato tramite indici e mai come indirizzi.
 
 ## Utilizzo
 
-Dopo aver compilato con comando make dentro a src usare il comando ./shell per accedere alla shell e poter lanciare i seguenti comandi
+Dopo aver compilato con comando make dentro a src usare il comando format la prima volta per creare il file contenente l'fs e infine ./shell per accedere alla shell e poter lanciare i comandi dentro al File System.
 
 
 Comandi disponibili:
@@ -34,7 +34,7 @@ Comandi disponibili:
 | `cat` | `cat <file>` | Stampa il contenuto di un file. |
 | `rm` | `rm <nome>` | Rimuove un file, o una directory se è vuota. |
 | `printsb` | `printsb` | Stampa il superblocco del file system attualmente aperto (comando di debug). |
-| `printchain` | `printchain <-freelist \| nome>` | Stampa la catena di blocchi: quella della free list con `-freelist`, oppure quella di un file/directory nella directory corrente passandone il nome (comando di debug). |
+| `printch` | `printch <-freelist \| nome>` | Stampa la catena di blocchi: quella della free list con `-freelist`, oppure quella di un file/directory nella directory corrente passandone il nome (comando di debug). |
 
 
 
